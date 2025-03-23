@@ -4,6 +4,7 @@ PyPDF2
 langchain-groq
 langchain
 langchain-google-genai
+google-generativeai
 faiss-cpu
 typing-extensions
 langchain-community
