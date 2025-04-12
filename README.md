@@ -1,2 +1,2 @@
 # HealthAI
-Team Project on Health &amp; Diet by Team Errorists
+Team Project on Health by Team MediMadness
