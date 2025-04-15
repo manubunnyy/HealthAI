@@ -119,7 +119,7 @@ def get_image_response(input_prompt, image_data):
     
     # Prepare the API request payload
     payload = {
-        "model": "llama-3.2-90b-vision-preview",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {
                 "role": "user",
