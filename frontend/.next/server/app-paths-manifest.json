@@ -1,0 +1,8 @@
+{
+  "/page": "app/page.js",
+  "/report/page": "app/report/page.js",
+  "/chat/page": "app/chat/page.js",
+  "/diet/page": "app/diet/page.js",
+  "/anomaly-detection/page": "app/anomaly-detection/page.js",
+  "/image-analysis/page": "app/image-analysis/page.js"
+}

@@ -1,0 +1,29 @@
+Note: Unnecessary use of -X or --request, POST is already inferred.
+* Host localhost:8000 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:8000...
+* connect to ::1 port 8000 from ::1 port 60588 failed: Connection refused
+*   Trying 127.0.0.1:8000...
+* Connected to localhost (127.0.0.1) port 8000
+> POST /chat/query HTTP/1.1
+> Host: localhost:8000
+> User-Agent: curl/8.7.1
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 18
+> 
+} [18 bytes data]
+* upload completely sent off: 18 bytes
+< HTTP/1.1 200 OK
+< date: Sat, 22 Nov 2025 11:20:09 GMT
+< server: uvicorn
+< content-length: 1992
+< content-type: application/json
+< 
+{ [1992 bytes data]
+100  2010  100  1992  100    18   2399     21 --:--:-- --:--:-- --:--:--  2418100  2010  100  1992  100    18   2397     21 --:--:-- --:--:-- --:--:--  2418
+* Connection #0 to host localhost left intact
+{"synthesis":"I'm here to assist you with medical information and guidance.","agent_responses":{"main_agent":{"content":"I'm here to assist you with medical information and guidance.\n\nKey medical concepts to consider are:\n- Informed consent: understanding treatment options and potential risks\n- Patient autonomy: making decisions about your own care\n- Medical record management: keeping track of your health history\n\nNecessary specialist consultations may include primary care physicians, specialists such as cardiologists or oncologists, and mental health professionals.\n\nQuick initial assessment: Please provide your symptoms, medical history, and any concerns to help me better understand your situation.","confidence":0.85,"metadata":{"processing_time":0.36836814880371094,"context_length":0,"query_length":5}},"diagnosis_agent":{"content":"I'm here to assist you with medical information and guidance. \n\nTo proceed, could you please provide some context or information about your query?","confidence":0.85,"metadata":{"processing_time":0.17330718040466309,"context_length":0,"query_length":5}},"treatment_agent":{"content":"I'm here to assist you with medical information and guidance.\n\nHowever, you haven't mentioned a specific condition. Please provide the condition you're inquiring about, and I'll provide you with the requested information.\n\nIf you're unsure, please provide general symptoms or concerns, and I'll do my best to assist you.","confidence":0.85,"metadata":{"processing_time":0.3180539608001709,"context_length":0,"query_length":5}},"research_agent":{"content":"I'm here to assist you with medical information and guidance.","confidence":0.85,"metadata":{"processing_time":0.22423911094665527,"context_length":0,"query_length":5}},"synthesis_agent":{"content":"I'm here to assist you with medical information and guidance.","confidence":0.9,"metadata":{"processing_time":0.13660693168640137,"source_responses":5,"context_used":false}}},"diet_plan":null}

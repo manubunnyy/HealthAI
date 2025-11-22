@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    table {
+        @apply w-full border-collapse my-4;
+    }
+
+    th {
+        @apply bg-glass-200 text-left p-3 border border-glass-border font-semibold text-white;
+    }
+
+    td {
+        @apply p-3 border border-glass-border text-gray-300;
+    }
+
+    tr:hover td {
+        @apply bg-glass-100 transition-colors;
+    }
+}
+
+:root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 15, 23, 42;
+    --background-end-rgb: 30, 41, 59;
+}
+
+body {
+    color: rgb(var(--foreground-rgb));
+    background: linear-gradient(to bottom right,
+            rgb(var(--background-start-rgb)),
+            rgb(var(--background-end-rgb))) fixed;
+    min-height: 100vh;
+}
+
+@layer utilities {
+    .glass-panel {
+        @apply bg-glass-100 backdrop-blur-lg border border-glass-border rounded-2xl shadow-xl;
+    }
+
+    .glass-button {
+        @apply bg-glass-200 hover:bg-glass-300 backdrop-blur-md border border-glass-border rounded-xl px-6 py-3 transition-all duration-300 active:scale-95;
+    }
+
+    .glass-input {
+        @apply bg-glass-100 backdrop-blur-sm border border-glass-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder-gray-400;
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
