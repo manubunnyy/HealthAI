@@ -2,17 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
-import sys
-
-# Polyfill for importlib.metadata.packages_distributions in Python < 3.10
-if sys.version_info < (3, 10):
-    try:
-        import importlib.metadata
-        import importlib_metadata
-        if not hasattr(importlib.metadata, "packages_distributions"):
-            importlib.metadata.packages_distributions = importlib_metadata.packages_distributions
-    except ImportError:
-        pass
 
 load_dotenv()
 
