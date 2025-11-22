@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
@@ -32,15 +31,24 @@ class HealthReportAnalyzer:
             model_name="llama-3.1-8b-instant",
             groq_api_key=os.getenv("GROQ_API_KEY")
         )
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        # Lazy-load embeddings only when needed
+        self._embeddings = None
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         self.vectorstore = None
         self._initialize_agents()
+    
+    @property
+    def embeddings(self):
+        """Lazy-load embeddings only when needed to save memory"""
+        if self._embeddings is None:
+            from sentence_transformers import SentenceTransformer
+            logger.info("Loading embeddings model (first use only)...")
+            # Use sentence-transformers directly for lighter memory footprint
+            self._embeddings = SentenceTransformer('all-MiniLM-L6-v2')
+        return self._embeddings
 
     def _initialize_agents(self):
         """Initialize specialized medical analysis agents"""
