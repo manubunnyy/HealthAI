@@ -31,7 +31,7 @@ export default function ImageAnalysisPage() {
         formData.append('file', selectedImage);
 
         try {
-            const response = await axios.post('http://localhost:8000/image/analyze', formData);
+            const response = await axios.post('https://healthai-b6y2.onrender.com/image/analyze', formData);
             setAnalysis(response.data.analysis);
         } catch (error) {
             console.error('Error analyzing image:', error);

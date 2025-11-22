@@ -36,7 +36,7 @@ export default function DietPage() {
         formData.append('file', selectedImage);
 
         try {
-            const response = await axios.post('http://localhost:8000/diet/analyze-food', formData);
+            const response = await axios.post('https://healthai-b6y2.onrender.com/diet/analyze-food', formData);
             setAnalysis(response.data.analysis);
         } catch (error) {
             console.error('Error analyzing food:', error);
@@ -50,7 +50,7 @@ export default function DietPage() {
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:8000/diet/generate-plan', { user_input: planInput });
+            const response = await axios.post('https://healthai-b6y2.onrender.com/diet/generate-plan', { user_input: planInput });
             setGeneratedPlan(response.data.plan);
         } catch (error) {
             console.error('Error generating plan:', error);

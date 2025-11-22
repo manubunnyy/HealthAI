@@ -40,7 +40,7 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:8000/chat/query', { query: userMessage.content });
+            const response = await axios.post('https://healthai-b6y2.onrender.com/chat/query', { query: userMessage.content });
 
             const assistantMessage: Message = {
                 role: 'assistant',
@@ -67,7 +67,7 @@ export default function ChatPage() {
             });
 
             try {
-                await axios.post('http://localhost:8000/chat/upload', formData);
+                await axios.post('https://healthai-b6y2.onrender.com/chat/upload', formData);
                 setMessages(prev => [...prev, { role: 'assistant', content: `Successfully processed ${e.target.files?.length} document(s). You can now ask questions about them.` }]);
             } catch (error) {
                 console.error('Error uploading files:', error);

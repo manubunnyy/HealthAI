@@ -44,7 +44,7 @@ export default function PredictionPage() {
                 payload.bp_diastolic = parseFloat(formData.bp_diastolic);
             }
 
-            const response = await axios.post('http://localhost:8000/prediction/analyze', payload);
+            const response = await axios.post('https://healthai-b6y2.onrender.com/prediction/analyze', payload);
             setResult(response.data);
         } catch (error) {
             console.error('Error analyzing health:', error);
@@ -145,8 +145,8 @@ export default function PredictionPage() {
                                 <div className="text-sm text-gray-400 mb-1">BMI Score</div>
                                 <div className="text-4xl font-bold text-white mb-1">{result.bmi}</div>
                                 <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${result.bmi_category === 'normal' ? 'bg-green-500/20 text-green-300' :
-                                        result.bmi_category === 'overweight' ? 'bg-yellow-500/20 text-yellow-300' :
-                                            'bg-red-500/20 text-red-300'
+                                    result.bmi_category === 'overweight' ? 'bg-yellow-500/20 text-yellow-300' :
+                                        'bg-red-500/20 text-red-300'
                                     }`}>
                                     {result.bmi_category.toUpperCase()}
                                 </div>

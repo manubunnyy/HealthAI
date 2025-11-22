@@ -44,7 +44,7 @@ export default function ReportPage() {
                 setProgressMessage('Analyzing medical data...');
             }, 1000);
 
-            const response = await axios.post('http://localhost:8000/report/analyze', formData);
+            const response = await axios.post('https://healthai-b6y2.onrender.com/report/analyze', formData);
 
             setProgress(90);
             setProgressMessage('Finalizing results...');
