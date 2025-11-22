@@ -29,5 +29,11 @@ async def root():
     return {"message": "HealthAI API is running"}
 
 @app.get("/health")
-async def health_check():
+def health_check():
     return {"status": "healthy"}
+
+# For running with uvicorn
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
