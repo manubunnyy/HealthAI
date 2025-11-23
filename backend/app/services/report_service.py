@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema.output_parser import StrOutputParser
-from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 import time
 import logging
@@ -31,34 +29,11 @@ class HealthReportAnalyzer:
             model_name="llama-3.1-8b-instant",
             groq_api_key=os.getenv("GROQ_API_KEY")
         )
-        # Lazy-load embeddings only when needed
-        self._embeddings = None
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
-        )
-        self.vectorstore = None
         self._initialize_agents()
     
-    @property
-    def embeddings(self):
-        """Lazy-load embeddings only when needed to save memory"""
-        if self._embeddings is None:
-            from sentence_transformers import SentenceTransformer
-            logger.info("Loading embeddings model (first use only)...")
-            # Use sentence-transformers directly for lighter memory footprint
-            self._embeddings = SentenceTransformer('all-MiniLM-L6-v2')
-        return self._embeddings
-
     def _initialize_agents(self):
         """Initialize specialized medical analysis agents"""
         self.agents = {
-            'document_processor': self._create_agent("""
-                You are a medical document processor specialized in health reports.
-                Extract all relevant medical information, organize it clearly, and maintain accuracy.
-                Focus on blood work, vital signs, and other measurable health metrics.
-            """),
-            
             'positive_analyzer': self._create_agent("""
                 You are a positive health findings specialist.
                 Identify and explain all positive health indicators in the report.
@@ -176,27 +151,8 @@ class HealthReportAnalyzer:
         
         return '\n\n'.join(formatted_findings)
 
-    async def process_document(self, file_content: str):
-        """Process document and create vector store"""
-        try:
-            chunks = self.text_splitter.split_text(file_content)
-            
-            if not chunks:
-                raise ValueError("No text chunks were created from the document")
-
-            self.vectorstore = await FAISS.afrom_texts(
-                texts=chunks,
-                embedding=self.embeddings,
-                normalize_L2=True
-            )
-            
-            return chunks
-        except Exception as e:
-            logger.error(f"Error processing document: {str(e)}")
-            raise
-
     async def analyze_report(self, report_text: str) -> Dict[str, AgentResponse]:
-        """Analyze report using multiple agents"""
+        """Analyze report using multiple agents with direct context"""
         results = {}
         
         try:
@@ -204,27 +160,18 @@ class HealthReportAnalyzer:
             sanitized_text = sanitize_text(report_text)
             logger.info("PII sanitized from report before analysis")
             
-            await self.process_document(sanitized_text)
+            # Direct context approach - pass full text to agents
+            # Llama 3.1 has 128k context, sufficient for most reports
             
             agents_list = list(self.agents.items())
-            # Skip document_processor as it's implicit in process_document or handled separately
-            # But the original code iterates from index 1 (skipping document_processor)
             
-            for idx, (agent_name, agent) in enumerate(agents_list[1:], 1):
+            for agent_name, agent in agents_list:
                 start_time = time.time()
                 
                 try:
-                    if self.vectorstore is not None:
-                        relevant_docs = await self.vectorstore.asimilarity_search(
-                            agent_name,
-                            k=3
-                        )
-                        context = "\n".join(doc.page_content for doc in relevant_docs)
-                        augmented_text = f"Context: {context}\n\nReport: {report_text}"
-                    else:
-                        augmented_text = report_text
+                    # Pass the full sanitized text directly
+                    response = await agent.ainvoke({"input": sanitized_text})
                     
-                    response = await agent.ainvoke({"input": augmented_text})
                     if agent_name == 'positive_analyzer':
                         response = self._format_findings(response)
                     

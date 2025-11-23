@@ -8,27 +8,13 @@ python-dotenv>=1.0.0
 # LangChain & AI
 langchain-groq>=0.1.0
 langchain>=0.1.0
-langchain-google-genai>=0.0.9
 langchain-community>=0.0.20
 groq>=0.4.0
-google-genai
-google-generativeai
-
-# Lightweight embeddings (lazy-loaded)
-sentence-transformers>=2.2.2
-
-# Vector Store
-faiss-cpu>=1.7.4
 
 # Document Processing
 pytesseract>=0.3.10
 Pillow>=10.0.0
 PyPDF2>=3.0.0
-
-# Data Processing
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.4.0
 
 # HTTP & Utils
 aiohttp>=3.9.0

@@ -10,9 +10,6 @@ from langchain_groq import ChatGroq
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.output_parser import StrOutputParser
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
 import time
 import json
@@ -33,8 +30,6 @@ class ProcessedDocument:
     """Structure for processed document information"""
     filename: str
     content: str
-    chunks: List[str]
-    total_chars: int
     doc_type: str
     summary: str = ""
 
@@ -59,33 +54,7 @@ class DietPlan:
 class DocumentProcessor:
     """Enhanced document processing with better error handling"""
     def __init__(self):
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            separators=["\n\n", "\n", ". ", " ", ""]
-        )
         self.processed_documents: List[ProcessedDocument] = []
-        self._initialize_embeddings()
-        self.vector_store = None
-
-    def _initialize_embeddings(self):
-        """Initialize Google AI embeddings"""
-        try:
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise ValueError("GOOGLE_API_KEY environment variable is not set")
-                
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            
-            self.embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001",
-                google_api_key=api_key,
-                credentials=None
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize embeddings: {str(e)}")
-            self.embeddings = None
 
     async def process_file(self, file_name: str, file_content: bytes, file_type: str, progress_callback: Callable = None) -> ProcessedDocument:
         """Process a single file"""
@@ -101,22 +70,21 @@ class DocumentProcessor:
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
 
-            if progress_callback: progress_callback(0.4, "Splitting content into chunks")
-            chunks = self.text_splitter.split_text(content)
-            
-            if progress_callback: progress_callback(0.6, "Generating document summary")
-            summary = await self._generate_summary(content[:1000])
-            
             if progress_callback: progress_callback(0.8, "Finalizing document processing")
             
-            return ProcessedDocument(
+            # Simple summary (first 200 chars)
+            summary = f"{content[:200]}..."
+            
+            doc = ProcessedDocument(
                 filename=file_name,
                 content=content,
-                chunks=chunks,
-                total_chars=len(content),
                 doc_type=doc_type,
                 summary=summary
             )
+            
+            self.processed_documents.append(doc)
+            return doc
+            
         except Exception as e:
             logger.error(f"Error processing {file_name}: {str(e)}")
             return None
@@ -147,48 +115,16 @@ class DocumentProcessor:
         except Exception as e:
             raise Exception(f"Image processing error: {str(e)}")
 
-    async def _generate_summary(self, text: str) -> str:
-        """Generate a brief summary of the document content"""
-        return f"{text[:200]}..."
-
-    async def update_vector_store(self, documents: List[ProcessedDocument], progress_callback: Callable = None):
-        """Update vector store with new documents"""
-        try:
-            if self.embeddings is None:
-                if progress_callback: progress_callback(0.5, "ERROR: Embeddings not initialized")
-                return False
-                
-            all_chunks = []
-            metadata_list = []
+    def get_full_context(self) -> str:
+        """Get full context from all processed documents"""
+        if not self.processed_documents:
+            return ""
+        
+        context_parts = []
+        for doc in self.processed_documents:
+            context_parts.append(f"--- Document: {doc.filename} ---\n{doc.content}\n")
             
-            for idx, doc in enumerate(documents):
-                if progress_callback:
-                    progress_callback(0.2 + (0.6 * (idx / len(documents))), f"Indexing {doc.filename}")
-                
-                for chunk_idx, chunk in enumerate(doc.chunks):
-                    all_chunks.append(chunk)
-                    metadata_list.append({
-                        "source": doc.filename,
-                        "chunk_index": chunk_idx,
-                        "doc_type": doc.doc_type
-                    })
-
-            if all_chunks:
-                if progress_callback: progress_callback(0.8, "Creating vector store")
-                self.vector_store = FAISS.from_texts(
-                    all_chunks,
-                    self.embeddings,
-                    metadatas=metadata_list
-                )
-                
-                if progress_callback: progress_callback(0.9, "Saving vector store")
-                self.vector_store.save_local("faiss_index")
-                
-                return True
-                
-        except Exception as e:
-            logger.error(f"Vector store update error: {str(e)}")
-            return False
+        return "\n".join(context_parts)
 
 class DietAgent:
     """Agent for generating personalized diet plans"""
@@ -517,14 +453,8 @@ For simple queries (like greetings), respond in one short sentence."""
                     processed_docs.append(doc)
 
             if processed_docs:
-                success = await self.doc_processor.update_vector_store(
-                    processed_docs,
-                    lambda p, m: status_callback('document_processor', 'working', 0.8 + (p * 0.2), m) if status_callback else None
-                )
-                
-                if success:
-                    if status_callback: status_callback('document_processor', 'completed', 1.0, "Documents processed successfully")
-                    return True
+                if status_callback: status_callback('document_processor', 'completed', 1.0, "Documents processed successfully")
+                return True
 
             if status_callback: status_callback('document_processor', 'error', 0, "Document processing failed")
             return False
@@ -533,21 +463,11 @@ For simple queries (like greetings), respond in one short sentence."""
             if status_callback: status_callback('document_processor', 'error', 0, str(e))
             return False
 
-    async def get_relevant_context(self, query: str) -> str:
-        """Get relevant context from vector store"""
-        try:
-            if self.doc_processor.vector_store:
-                docs = self.doc_processor.vector_store.similarity_search(query, k=3)
-                return "\n\n".join(doc.page_content for doc in docs)
-            return ""
-        except Exception as e:
-            logger.error(f"Error retrieving context: {str(e)}")
-            return ""
-
     async def process_query(self, query: str, status_callback: Callable = None) -> Dict[str, Union[AgentResponse, DietPlan]]:
         """Process query through multi-agent system"""
         responses = {}
-        context = await self.get_relevant_context(query)
+        # Use full context from DocumentProcessor
+        context = self.doc_processor.get_full_context()
         chat_history = self._format_chat_history()
         
         try:
