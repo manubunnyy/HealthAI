@@ -6,10 +6,7 @@ from dataclasses import dataclass
 import pytesseract
 from PIL import Image
 from PyPDF2 import PdfReader
-from langchain_groq import ChatGroq
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema.output_parser import StrOutputParser
+from groq import Groq
 from dotenv import load_dotenv
 import time
 import json
@@ -129,11 +126,9 @@ class DocumentProcessor:
 class DietAgent:
     """Agent for generating personalized diet plans"""
     def __init__(self):
-        self.llm = ChatGroq(
-            temperature=0.3,
-            model_name="llama-3.1-8b-instant",
-            groq_api_key=os.getenv("GROQ_API_KEY")
-        )
+        self.api_key = os.getenv("GROQ_API_KEY")
+        self.client = Groq(api_key=self.api_key)
+        self.model = "llama-3.1-8b-instant"
         self._initialize_prompt()
         self.specialized_diets = {
             "kidney_stone": {
@@ -204,7 +199,7 @@ class DietAgent:
 
     def _initialize_prompt(self):
         """Initialize diet agent prompt"""
-        self.prompt = """You are a nutrition specialist. Be concise.
+        self.system_prompt = """You are a nutrition specialist. Be concise.
 Context: {context}
 Query: {query}
 Chat History: {chat_history}
@@ -225,10 +220,32 @@ Then provide a simple and short diet plan with:
 Format as JSON with keys: diet_needed, breakfast, lunch, dinner, snacks, notes, condition, preference.
 Keep each suggestion under 5 words. Total response must be under 50 words."""
 
-        self.agent = ChatPromptTemplate.from_messages([
-            ("system", self.prompt),
-            ("human", "{input}")
-        ]) | self.llm | StrOutputParser()
+    async def _run_agent(self, input_text: str, context: str, query: str, chat_history: str) -> str:
+        """Run agent using Groq API"""
+        try:
+            formatted_system_prompt = self.system_prompt.format(
+                context=context,
+                query=query,
+                chat_history=chat_history
+            )
+            
+            def _call_api():
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": formatted_system_prompt},
+                        {"role": "user", "content": input_text}
+                    ],
+                    temperature=0.3,
+                    max_tokens=1024,
+                    response_format={"type": "json_object"}
+                )
+                return completion.choices[0].message.content
+
+            return await asyncio.to_thread(_call_api)
+        except Exception as e:
+            logger.error(f"Error running diet agent: {str(e)}")
+            raise
 
     async def generate_diet_plan(self, query: str, context: str, chat_history: str) -> Optional[Dict]:
         """Generate a diet plan based on the conversation"""
@@ -270,12 +287,7 @@ Keep each suggestion under 5 words. Total response must be under 50 words."""
                 "sick", "ill", "unwell", "symptoms", "suffering", "condition", 
                 "pain", "ache", "hurt", "doctor", "hospital", "medicine"
             ]):
-                response = await self.agent.ainvoke({
-                    "input": query,
-                    "context": context,
-                    "query": query,
-                    "chat_history": chat_history
-                })
+                response = await self._run_agent(query, context, query, chat_history)
                 
                 try:
                     diet_data = json.loads(response)
@@ -343,16 +355,13 @@ Keep each suggestion under 5 words. Total response must be under 50 words."""
 class HealthcareAgent:
     """Healthcare agent with concise response generation"""
     def __init__(self):
-        self.llm = ChatGroq(
-            temperature=0.3,
-            model_name="llama-3.1-8b-instant",
-            groq_api_key=os.getenv("GROQ_API_KEY")
-        )
+        self.api_key = os.getenv("GROQ_API_KEY")
+        self.client = Groq(api_key=self.api_key)
+        self.model = "llama-3.1-8b-instant"
         self.chat_history = []
         self.doc_processor = DocumentProcessor()
         self.diet_agent = DietAgent()
         self._initialize_prompts()
-        self.agents = self._initialize_agents()
 
     def _initialize_prompts(self):
         """Initialize prompts optimized for concise responses"""
@@ -416,22 +425,13 @@ Keep the final response under 150 words and focus on practical next steps.
 For simple queries (like greetings), respond in one short sentence."""
         }
 
-    def _initialize_agents(self):
-        """Initialize enhanced agent system"""
-        return {
-            name: ChatPromptTemplate.from_messages([
-                ("system", prompt),
-                ("human", "{input}")
-            ]) | self.llm | StrOutputParser()
-            for name, prompt in self.prompts.items()
-        }
-
     def _format_chat_history(self) -> str:
         """Format chat history for context"""
         formatted = []
         for msg in self.chat_history[-5:]:
-            role = "User" if isinstance(msg, HumanMessage) else "Assistant"
-            formatted.append(f"{role}: {msg.content}")
+            role = msg.get("role", "user").title()
+            content = msg.get("content", "")
+            formatted.append(f"{role}: {content}")
         return "\n".join(formatted)
 
     async def process_documents(self, files: List[tuple], status_callback: Callable = None) -> bool:
@@ -468,11 +468,11 @@ For simple queries (like greetings), respond in one short sentence."""
         responses = {}
         # Use full context from DocumentProcessor
         context = self.doc_processor.get_full_context()
-        chat_history = self._format_chat_history()
+        chat_history_str = self._format_chat_history()
         
         try:
             if status_callback: status_callback('main_agent', 'working', 0.2, "Analyzing query")
-            main_response = await self._get_agent_response('main_agent', query, context, chat_history)
+            main_response = await self._get_agent_response('main_agent', query, context, chat_history_str)
             responses['main_agent'] = main_response
             if status_callback: status_callback('main_agent', 'completed', 1.0, "Analysis complete")
 
@@ -483,10 +483,10 @@ For simple queries (like greetings), respond in one short sentence."""
                 status_callback('diet_agent', 'working', 0.2, "Creating diet plan")
 
             specialist_tasks = [
-                self._get_agent_response('diagnosis_agent', query, context, chat_history),
-                self._get_agent_response('treatment_agent', query, context, chat_history),
-                self._get_agent_response('research_agent', query, context, chat_history),
-                self.diet_agent.generate_diet_plan(query, context, chat_history)
+                self._get_agent_response('diagnosis_agent', query, context, chat_history_str),
+                self._get_agent_response('treatment_agent', query, context, chat_history_str),
+                self._get_agent_response('research_agent', query, context, chat_history_str),
+                self.diet_agent.generate_diet_plan(query, context, chat_history_str)
             ]
 
             specialist_responses = await asyncio.gather(*specialist_tasks)
@@ -503,20 +503,20 @@ For simple queries (like greetings), respond in one short sentence."""
             if status_callback: status_callback('diet_agent', 'completed', 1.0, "Diet plan generated")
 
             if status_callback: status_callback('synthesis_agent', 'working', 0.5, "Synthesizing insights")
-            final_response = await self._synthesize_responses(query, context, chat_history, responses)
+            final_response = await self._synthesize_responses(query, context, chat_history_str, responses)
             responses['synthesis_agent'] = final_response
             if status_callback: status_callback('synthesis_agent', 'completed', 1.0, "Response synthesis complete")
 
             self.chat_history.extend([
-                HumanMessage(content=query),
-                AIMessage(content=final_response.content)
+                {"role": "user", "content": query},
+                {"role": "assistant", "content": final_response.content}
             ])
 
             return responses
 
         except Exception as e:
             if status_callback:
-                for agent in self.agents.keys():
+                for agent in self.prompts.keys():
                     status_callback(agent, 'error', 0, str(e))
                 status_callback('diet_agent', 'error', 0, str(e))
             raise Exception(f"Query processing error: {str(e)}")
@@ -526,12 +526,27 @@ For simple queries (like greetings), respond in one short sentence."""
         start_time = time.time()
         
         try:
-            response = await self.agents[agent_name].ainvoke({
-                "input": query,
-                "context": context,
-                "query": query,
-                "chat_history": chat_history
-            })
+            system_prompt = self.prompts[agent_name]
+            formatted_system_prompt = system_prompt.format(
+                context=context,
+                query=query,
+                chat_history=chat_history,
+                agent_responses="" # Only used for synthesis
+            )
+            
+            def _call_api():
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": formatted_system_prompt},
+                        {"role": "user", "content": query}
+                    ],
+                    temperature=0.3,
+                    max_tokens=2048
+                )
+                return completion.choices[0].message.content
+
+            response = await asyncio.to_thread(_call_api)
             
             # Sanitize PII from response
             response = sanitize_text(response)
@@ -566,13 +581,27 @@ For simple queries (like greetings), respond in one short sentence."""
 
             start_time = time.time()
             
-            synthesis_response = await self.agents['synthesis_agent'].ainvoke({
-                "input": query,
-                "context": context,
-                "query": query,
-                "chat_history": chat_history,
-                "agent_responses": formatted_responses
-            })
+            system_prompt = self.prompts['synthesis_agent']
+            formatted_system_prompt = system_prompt.format(
+                context=context,
+                query=query,
+                chat_history=chat_history,
+                agent_responses=formatted_responses
+            )
+            
+            def _call_api():
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": formatted_system_prompt},
+                        {"role": "user", "content": query}
+                    ],
+                    temperature=0.3,
+                    max_tokens=2048
+                )
+                return completion.choices[0].message.content
+
+            synthesis_response = await asyncio.to_thread(_call_api)
             
             # Sanitize PII from synthesis response
             synthesis_response = sanitize_text(synthesis_response)

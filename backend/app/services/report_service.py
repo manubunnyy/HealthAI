@@ -2,9 +2,7 @@ import os
 import asyncio
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from langchain_groq import ChatGroq
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema.output_parser import StrOutputParser
+from groq import Groq
 from dotenv import load_dotenv
 import time
 import logging
@@ -22,19 +20,19 @@ class AgentResponse:
     processing_time: float
 
 class HealthReportAnalyzer:
-    """Enhanced health report analysis system with specialized agents"""
+    """Enhanced health report analysis system with specialized agents using native Groq client"""
     def __init__(self):
-        self.llm = ChatGroq(
-            temperature=0.3,
-            model_name="llama-3.1-8b-instant",
-            groq_api_key=os.getenv("GROQ_API_KEY")
-        )
+        self.api_key = os.getenv("GROQ_API_KEY")
+        if not self.api_key:
+            logger.warning("GROQ_API_KEY not set")
+        self.client = Groq(api_key=self.api_key)
+        self.model = "llama-3.1-8b-instant"
         self._initialize_agents()
     
     def _initialize_agents(self):
-        """Initialize specialized medical analysis agents"""
-        self.agents = {
-            'positive_analyzer': self._create_agent("""
+        """Initialize specialized medical analysis agents system prompts"""
+        self.agent_prompts = {
+            'positive_analyzer': """
                 You are a positive health findings specialist.
                 Identify and explain all positive health indicators in the report.
                 
@@ -51,33 +49,33 @@ class HealthReportAnalyzer:
                 [blank line here]
                 ✓ [Next Test Name]: [Value] [Unit] (normal range: [range])
                   Significance: [Brief explanation of why this is positive]
-            """),
+            """,
             
-            'negative_analyzer': self._create_agent("""
+            'negative_analyzer': """
                 You are a health risk assessment specialist.
                 Identify concerning findings and potential health risks.
                 Format findings as bullet points starting with "⚠".
                 Each finding must be on a new line.
                 Include severity levels and recommended actions.
-            """),
+            """,
             
-            'summary_agent': self._create_agent("""
+            'summary_agent': """
                 You are a medical report summarizer.
                 Create a comprehensive yet concise summary of all findings.
                 Include key metrics, trends, and important observations.
                 Use clear, patient-friendly language.
                 Format with clear sections and bullet points.
-            """),
+            """,
             
-            'recommendation_agent': self._create_agent("""
+            'recommendation_agent': """
                 You are a healthcare recommendations specialist.
                 Provide actionable advice based on the report findings.
                 Include lifestyle, diet, and exercise recommendations.
                 Prioritize suggestions by importance and urgency.
                 Format each recommendation on a new line with clear categorization.
-            """),
+            """,
             
-            'diet_planner': self._create_agent("""
+            'diet_planner': """
                 You are a specialized medical nutritionist who creates personalized diet plans.
                 
                 INSTRUCTIONS:
@@ -115,16 +113,32 @@ class HealthReportAnalyzer:
                 
                 ## HYDRATION RECOMMENDATIONS
                 - [Specific recommendations]
-            """)
+            """
         }
 
-    def _create_agent(self, system_prompt: str):
-        """Create an agent with specific system prompt"""
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{input}")
-        ])
-        return prompt | self.llm | StrOutputParser()
+    async def _run_agent(self, system_prompt: str, user_input: str) -> str:
+        """Run a single agent using Groq API"""
+        try:
+            # Run in a thread pool since Groq client is synchronous (or use AsyncGroq if available, 
+            # but standard Groq client is sync. We can wrap it.)
+            # For simplicity and compatibility, we'll use the sync client in a thread.
+            
+            def _call_api():
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_input}
+                    ],
+                    temperature=0.3,
+                    max_tokens=2048
+                )
+                return completion.choices[0].message.content
+
+            return await asyncio.to_thread(_call_api)
+        except Exception as e:
+            logger.error(f"Error running agent: {str(e)}")
+            raise
 
     def _format_findings(self, response: str) -> str:
         """Format the findings to ensure proper line breaks and spacing"""
@@ -160,17 +174,12 @@ class HealthReportAnalyzer:
             sanitized_text = sanitize_text(report_text)
             logger.info("PII sanitized from report before analysis")
             
-            # Direct context approach - pass full text to agents
-            # Llama 3.1 has 128k context, sufficient for most reports
-            
-            agents_list = list(self.agents.items())
-            
-            for agent_name, agent in agents_list:
+            for agent_name, system_prompt in self.agent_prompts.items():
                 start_time = time.time()
                 
                 try:
                     # Pass the full sanitized text directly
-                    response = await agent.ainvoke({"input": sanitized_text})
+                    response = await self._run_agent(system_prompt, sanitized_text)
                     
                     if agent_name == 'positive_analyzer':
                         response = self._format_findings(response)
@@ -227,21 +236,16 @@ class HealthReportAnalyzer:
     async def extract_abnormal_conditions(self, report_text: str) -> List[str]:
         """Extract abnormal conditions from the report text"""
         try:
-            extract_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a medical condition extractor.
-                    Extract all abnormal test results and conditions from the provided medical report.
-                    Return ONLY a list of specific conditions, one per line.
-                    DO NOT include normal results.
-                    Example output:
-                    Low Vitamin D
-                    Elevated LDL cholesterol
-                    Hypothyroidism"""),
-                ("human", "{report}")
-            ])
+            system_prompt = """You are a medical condition extractor.
+                Extract all abnormal test results and conditions from the provided medical report.
+                Return ONLY a list of specific conditions, one per line.
+                DO NOT include normal results.
+                Example output:
+                Low Vitamin D
+                Elevated LDL cholesterol
+                Hypothyroidism"""
             
-            chain = extract_prompt | self.llm | StrOutputParser()
-            
-            conditions_text = await chain.ainvoke({"report": report_text})
+            conditions_text = await self._run_agent(system_prompt, report_text)
             
             conditions = [
                 cond.strip() for cond in conditions_text.split('\n')
@@ -258,46 +262,35 @@ class HealthReportAnalyzer:
         try:
             conditions = await self.extract_abnormal_conditions(report_text)
             
-            diet_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a specialized medical nutritionist.
-                    Create a comprehensive diet plan addressing the specific abnormal conditions listed.
-                    Include scientific rationale for each recommendation.
-                    Format as:
-                    1. Analysis of each condition and its nutritional implications
-                    2. Specific foods to eat and avoid for each condition
-                    3. A detailed 7-day meal plan with recipes
-                    4. Supplement recommendations if needed"""),
-                ("human", "Create a personalized diet plan for these conditions: {conditions}")
-            ])
+            diet_system_prompt = """You are a specialized medical nutritionist.
+                Create a comprehensive diet plan addressing the specific abnormal conditions listed.
+                Include scientific rationale for each recommendation.
+                Format as:
+                1. Analysis of each condition and its nutritional implications
+                2. Specific foods to eat and avoid for each condition
+                3. A detailed 7-day meal plan with recipes
+                4. Supplement recommendations if needed"""
             
-            chain = diet_prompt | self.llm | StrOutputParser()
-            
-            diet_plan = await chain.ainvoke({"conditions": "\n".join(conditions)})
+            diet_plan = await self._run_agent(diet_system_prompt, f"Create a personalized diet plan for these conditions: {' '.join(conditions)}")
             
             web_results = await self.web_search_diet_info(conditions)
             
-            combined_prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a medical nutritionist creating the optimal diet plan.
-                    Combine the AI-generated diet plan with web research to create the most 
-                    comprehensive and evidence-based recommendations.
-                    Keep formatting clear with headers, bullet points, and 7-day meal plan."""),
-                ("human", """
-                AI Diet Plan:
-                {diet_plan}
-                
-                Web Research:
-                {web_results}
-                
-                Create an optimized diet plan combining this information.
-                """)
-            ])
+            combined_system_prompt = """You are a medical nutritionist creating the optimal diet plan.
+                Combine the AI-generated diet plan with web research to create the most 
+                comprehensive and evidence-based recommendations.
+                Keep formatting clear with headers, bullet points, and 7-day meal plan."""
             
-            chain = combined_prompt | self.llm | StrOutputParser()
+            combined_input = f"""
+            AI Diet Plan:
+            {diet_plan}
             
-            final_diet_plan = await chain.ainvoke({
-                "diet_plan": diet_plan,
-                "web_results": web_results
-            })
+            Web Research:
+            {web_results}
+            
+            Create an optimized diet plan combining this information.
+            """
+            
+            final_diet_plan = await self._run_agent(combined_system_prompt, combined_input)
             
             return final_diet_plan
         except Exception as e:
