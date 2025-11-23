@@ -175,7 +175,7 @@ class HealthReportAnalyzer:
         Accepts either a file_object (for PDFs) or text_content (for other formats).
         """
         results = {}
-        CHUNK_SIZE = 30000 # Reduced chunk size for safety
+        CHUNK_SIZE = 15000 # Reduced chunk size further for safety (approx 3-4 pages)
         
         try:
             all_positive_findings = []
@@ -206,27 +206,35 @@ class HealthReportAnalyzer:
                 # It's a PDF file object
                 from PyPDF2 import PdfReader
                 pdf_reader = PdfReader(file_object)
-                current_chunk = ""
+                current_chunk_parts = []
+                current_chunk_size = 0
                 
                 for page in pdf_reader.pages:
                     extracted = page.extract_text()
                     if extracted:
-                        current_chunk += extracted + "\n"
+                        current_chunk_parts.append(extracted)
+                        current_chunk_size += len(extracted)
                     
                     # If chunk is big enough, process it immediately and clear memory
-                    if len(current_chunk) >= CHUNK_SIZE:
-                        await process_chunk(current_chunk)
-                        current_chunk = "" # Clear memory
+                    if current_chunk_size >= CHUNK_SIZE:
+                        chunk_text = "\n".join(current_chunk_parts)
+                        await process_chunk(chunk_text)
+                        
+                        # Clear memory
+                        del chunk_text
+                        current_chunk_parts = [] 
+                        current_chunk_size = 0
                         import gc; gc.collect()
                 
                 # Process remaining text
-                if current_chunk:
-                    await process_chunk(current_chunk)
-                    del current_chunk
+                if current_chunk_parts:
+                    chunk_text = "\n".join(current_chunk_parts)
+                    await process_chunk(chunk_text)
+                    del chunk_text
+                    del current_chunk_parts
                     
             elif text_content:
                 # It's raw text (already loaded, so we just chunk it)
-                # This path is less memory efficient but unavoidable for non-PDFs if they are already read
                 chunks = self._chunk_text(text_content, CHUNK_SIZE)
                 for chunk in chunks:
                     await process_chunk(chunk)
