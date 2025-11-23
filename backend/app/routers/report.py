@@ -21,7 +21,7 @@ class DietPlanRequest(BaseModel):
 async def analyze_report(file: UploadFile = File(...)):
     """Analyze health report"""
     try:
-    try:
+
         # Use file.file directly to avoid loading entire file into RAM
         # UploadFile spools to disk for large files, so this is memory efficient
         
