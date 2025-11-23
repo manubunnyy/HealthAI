@@ -37,6 +37,11 @@ async def analyze_report(file: UploadFile = File(...)):
                     if extracted:
                         text += extracted + "\n"
                 
+                # Truncate text to 60,000 characters to prevent OOM
+                # This is roughly 15-20 pages of dense text, sufficient for most medical reports
+                if len(text) > 60000:
+                    text = text[:60000] + "\n...[Truncated for memory safety]..."
+                
                 if not text.strip():
                     raise HTTPException(
                         status_code=400, 

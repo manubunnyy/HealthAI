@@ -476,30 +476,27 @@ For simple queries (like greetings), respond in one short sentence."""
             responses['main_agent'] = main_response
             if status_callback: status_callback('main_agent', 'completed', 1.0, "Analysis complete")
 
-            if status_callback:
-                status_callback('diagnosis_agent', 'working', 0.2, "Analyzing symptoms")
-                status_callback('treatment_agent', 'working', 0.2, "Evaluating treatments")
-                status_callback('research_agent', 'working', 0.2, "Reviewing research")
-                status_callback('diet_agent', 'working', 0.2, "Creating diet plan")
-
-            specialist_tasks = [
-                self._get_agent_response('diagnosis_agent', query, context, chat_history_str),
-                self._get_agent_response('treatment_agent', query, context, chat_history_str),
-                self._get_agent_response('research_agent', query, context, chat_history_str),
-                self.diet_agent.generate_diet_plan(query, context, chat_history_str)
-            ]
-
-            specialist_responses = await asyncio.gather(*specialist_tasks)
+            # Run agents sequentially to save memory (avoid concurrency spikes)
+            specialist_agents = ['diagnosis_agent', 'treatment_agent', 'research_agent']
             
-            for agent_name, response in zip(
-                ['diagnosis_agent', 'treatment_agent', 'research_agent'],
-                specialist_responses[:-1]
-            ):
-                responses[agent_name] = response
+            for agent_name in specialist_agents:
                 if status_callback:
-                    status_callback(agent_name, 'completed', 1.0, f"{agent_name.split('_')[0].title()} analysis complete")
+                    status_callback(agent_name, 'working', 0.2, f"Running {agent_name.split('_')[0]} analysis")
                 
-            responses['diet_plan'] = specialist_responses[-1]
+                response = await self._get_agent_response(agent_name, query, context, chat_history_str)
+                responses[agent_name] = response
+                
+                if status_callback:
+                    status_callback(agent_name, 'completed', 1.0, "Analysis complete")
+                
+                # Force GC after each agent
+                import gc
+                gc.collect()
+
+            # Run diet agent last
+            if status_callback: status_callback('diet_agent', 'working', 0.2, "Creating diet plan")
+            diet_response = await self.diet_agent.generate_diet_plan(query, context, chat_history_str)
+            responses['diet_plan'] = diet_response
             if status_callback: status_callback('diet_agent', 'completed', 1.0, "Diet plan generated")
 
             if status_callback: status_callback('synthesis_agent', 'working', 0.5, "Synthesizing insights")
