@@ -175,7 +175,8 @@ class HealthReportAnalyzer:
         Accepts either a file_object (for PDFs) or text_content (for other formats).
         """
         results = {}
-        CHUNK_SIZE = 15000 # Reduced chunk size further for safety (approx 3-4 pages)
+        CHUNK_SIZE = 15000 
+        MAX_TEXT_LENGTH = 200000 # Safety ceiling (approx 100 pages) to prevent OOM
         
         try:
             all_positive_findings = []
@@ -208,12 +209,23 @@ class HealthReportAnalyzer:
                 pdf_reader = PdfReader(file_object)
                 current_chunk_parts = []
                 current_chunk_size = 0
+                total_processed_length = 0
                 
-                for page in pdf_reader.pages:
+                for i, page in enumerate(pdf_reader.pages):
+                    # Safety break
+                    if total_processed_length > MAX_TEXT_LENGTH:
+                        logger.warning(f"Report exceeded {MAX_TEXT_LENGTH} chars. Stopping extraction to prevent OOM.")
+                        break
+                        
                     extracted = page.extract_text()
                     if extracted:
                         current_chunk_parts.append(extracted)
                         current_chunk_size += len(extracted)
+                        total_processed_length += len(extracted)
+                    
+                    # Explicitly clear page object
+                    del page
+                    del extracted
                     
                     # If chunk is big enough, process it immediately and clear memory
                     if current_chunk_size >= CHUNK_SIZE:
@@ -232,9 +244,16 @@ class HealthReportAnalyzer:
                     await process_chunk(chunk_text)
                     del chunk_text
                     del current_chunk_parts
+                
+                # Explicitly delete reader
+                del pdf_reader
+                import gc; gc.collect()
                     
             elif text_content:
-                # It's raw text (already loaded, so we just chunk it)
+                # Truncate raw text if too long
+                if len(text_content) > MAX_TEXT_LENGTH:
+                    text_content = text_content[:MAX_TEXT_LENGTH]
+                    
                 chunks = self._chunk_text(text_content, CHUNK_SIZE)
                 for chunk in chunks:
                     await process_chunk(chunk)
