@@ -195,6 +195,10 @@ class HealthReportAnalyzer:
                         confidence=0.0,
                         processing_time=0.0
                     )
+                
+                # Force garbage collection after each agent
+                import gc
+                gc.collect()
             
             return results
         except Exception as e:

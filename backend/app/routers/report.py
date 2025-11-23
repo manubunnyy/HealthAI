@@ -21,11 +21,16 @@ class DietPlanRequest(BaseModel):
 async def analyze_report(file: UploadFile = File(...)):
     """Analyze health report"""
     try:
-        content = await file.read()
+    try:
+        # Use file.file directly to avoid loading entire file into RAM
+        # UploadFile spools to disk for large files, so this is memory efficient
         
         if file.content_type == "application/pdf":
             try:
-                pdf_reader = PdfReader(io.BytesIO(content))
+                # Reset file pointer to beginning
+                await file.seek(0)
+                # Pass the file-like object directly
+                pdf_reader = PdfReader(file.file)
                 text = ""
                 for page in pdf_reader.pages:
                     extracted = page.extract_text()
@@ -42,7 +47,15 @@ async def analyze_report(file: UploadFile = File(...)):
                     raise e
                 raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(e)}")
         else:
+            # For non-PDFs, we still need to read, but they are usually smaller text files
+            content = await file.read()
             text = content.decode()
+            
+        # Explicitly clear large objects
+        import gc
+        gc.collect()
+            
+        results = await analyzer.analyze_report(text)
             
         results = await analyzer.analyze_report(text)
         
