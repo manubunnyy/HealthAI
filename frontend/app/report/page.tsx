@@ -17,15 +17,19 @@ export default function ReportPage() {
     const [progressMessage, setProgressMessage] = useState('');
     const [activeTab, setActiveTab] = useState<'positive' | 'negative' | 'summary'>('summary');
 
+    const [error, setError] = useState<string | null>(null);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
+            setError(null);
         }
     };
 
     const handleAnalyze = async () => {
         if (!file) return;
         setIsLoading(true);
+        setError(null);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -53,12 +57,13 @@ export default function ReportPage() {
                 setResults(response.data.results);
                 setProgress(100);
                 setProgressMessage('Analysis complete!');
+                setIsLoading(false);
             }, 300);
-        } catch (error) {
-            console.error('Error analyzing report:', error);
-            setProgressMessage('Error analyzing report');
-        } finally {
-            setTimeout(() => setIsLoading(false), 500);
+        } catch (err: any) {
+            console.error('Error analyzing report:', err);
+            const errorMessage = err.response?.data?.detail || 'Failed to analyze report. Please try again.';
+            setError(errorMessage);
+            setIsLoading(false);
         }
     };
 
@@ -90,6 +95,12 @@ export default function ReportPage() {
                         </GlassButton>
                         {isLoading && (
                             <ProgressBar progress={progress} message={progressMessage} className="mt-4" />
+                        )}
+                        {error && (
+                            <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm flex items-center gap-2">
+                                <AlertTriangle size={16} />
+                                {error}
+                            </div>
                         )}
                     </div>
                 </GlassCard>

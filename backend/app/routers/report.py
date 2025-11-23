@@ -24,10 +24,23 @@ async def analyze_report(file: UploadFile = File(...)):
         content = await file.read()
         
         if file.content_type == "application/pdf":
-            pdf_reader = PdfReader(io.BytesIO(content))
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+            try:
+                pdf_reader = PdfReader(io.BytesIO(content))
+                text = ""
+                for page in pdf_reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+                
+                if not text.strip():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Could not extract text from PDF. If this is a scanned document, please use an image format or a text-based PDF."
+                    )
+            except Exception as e:
+                if isinstance(e, HTTPException):
+                    raise e
+                raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(e)}")
         else:
             text = content.decode()
             
