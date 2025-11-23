@@ -23,7 +23,7 @@ export default function RootLayout({
                     <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
                 </div>
                 <Navbar />
-                <main className="min-h-screen p-4 md:p-8 pt-20">
+                <main className="min-h-screen px-4 py-6 md:px-8 md:py-12 pt-24 md:pt-28 max-w-[1920px] mx-auto">
                     {children}
                 </main>
             </body>

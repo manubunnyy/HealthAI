@@ -95,24 +95,24 @@ export default function ReportPage() {
                 </GlassCard>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div className="lg:col-span-1 space-y-2">
+                    <div className="lg:col-span-1 grid grid-cols-3 lg:grid-cols-1 gap-2 lg:gap-2">
                         <button
                             onClick={() => setActiveTab('summary')}
-                            className={`w-full p-3 rounded-xl text-left transition-all ${activeTab === 'summary' ? 'bg-blue-600/20 border border-blue-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
+                            className={`w-full p-2 md:p-3 rounded-xl text-sm md:text-base text-center lg:text-left transition-all ${activeTab === 'summary' ? 'bg-blue-600/20 border border-blue-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
                         >
                             Summary
                         </button>
                         <button
                             onClick={() => setActiveTab('positive')}
-                            className={`w-full p-3 rounded-xl text-left transition-all ${activeTab === 'positive' ? 'bg-green-600/20 border border-green-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
+                            className={`w-full p-2 md:p-3 rounded-xl text-sm md:text-base text-center lg:text-left transition-all ${activeTab === 'positive' ? 'bg-green-600/20 border border-green-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
                         >
-                            Positive Findings
+                            Positive
                         </button>
                         <button
                             onClick={() => setActiveTab('negative')}
-                            className={`w-full p-3 rounded-xl text-left transition-all ${activeTab === 'negative' ? 'bg-red-600/20 border border-red-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
+                            className={`w-full p-2 md:p-3 rounded-xl text-sm md:text-base text-center lg:text-left transition-all ${activeTab === 'negative' ? 'bg-red-600/20 border border-red-500 text-white' : 'text-gray-400 hover:bg-glass-100'}`}
                         >
-                            Areas of Concern
+                            Concerns
                         </button>
                     </div>
 

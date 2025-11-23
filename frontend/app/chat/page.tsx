@@ -77,7 +77,7 @@ export default function ChatPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto h-[calc(100vh-8rem)] flex flex-col">
+        <div className="max-w-4xl mx-auto h-[calc(100dvh-8rem)] flex flex-col">
             <header className="mb-6">
                 <h1 className="text-3xl font-bold text-white mb-2">Health Assistant</h1>
                 <p className="text-gray-400">Chat with AI about your health concerns and documents</p>

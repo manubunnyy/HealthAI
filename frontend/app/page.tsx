@@ -50,11 +50,11 @@ export default function Home() {
 
     return (
         <div className="max-w-7xl mx-auto">
-            <header className="mb-16 text-center">
-                <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-6 tracking-tight">
+            <header className="mb-12 md:mb-20 text-center px-4">
+                <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-4 md:mb-6 tracking-tight">
                     HealthAI
                 </h1>
-                <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
                     Your intelligent companion for a healthier life. Experience the future of personal healthcare management.
                 </p>
             </header>
