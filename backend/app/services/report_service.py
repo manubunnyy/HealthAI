@@ -170,16 +170,22 @@ class HealthReportAnalyzer:
         results = {}
         
         try:
-            # Sanitize PII before processing
-            sanitized_text = sanitize_text(report_text)
-            logger.info("PII sanitized from report before analysis")
+            # Skip local PII sanitization to save memory (user request)
+            # sanitized_text = sanitize_text(report_text)
+            # logger.info("PII sanitized from report before analysis")
+            
+            # Use raw text but instruct model to be careful
+            sanitized_text = report_text
             
             for agent_name, system_prompt in self.agent_prompts.items():
+                # Add strict privacy instruction to every prompt
+                privacy_instruction = "\n\nIMPORTANT PRIVACY INSTRUCTION: You are processing a medical report. STRICTLY DO NOT output the patient's name, ID, date of birth, or any other personally identifiable information (PII). Refer to the patient as 'The Patient'. Anonymize all output."
+                full_prompt = system_prompt + privacy_instruction
                 start_time = time.time()
                 
                 try:
-                    # Pass the full sanitized text directly
-                    response = await self._run_agent(system_prompt, sanitized_text)
+                    # Pass the full text directly with privacy-enhanced prompt
+                    response = await self._run_agent(full_prompt, sanitized_text)
                     
                     if agent_name == 'positive_analyzer':
                         response = self._format_findings(response)

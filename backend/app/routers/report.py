@@ -51,7 +51,12 @@ async def analyze_report(file: UploadFile = File(...)):
             content = await file.read()
             text = content.decode()
             
-        # Explicitly clear large objects
+        # Explicitly clear large objects to free memory before analysis
+        if 'pdf_reader' in locals():
+            del pdf_reader
+        if 'content' in locals():
+            del content
+            
         import gc
         gc.collect()
             
