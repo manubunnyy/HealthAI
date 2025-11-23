@@ -291,25 +291,6 @@ class HealthReportAnalyzer:
             logger.error(f"Error in analyze_report: {str(e)}")
             raise
 
-    async def web_search_diet_info(self, abnormal_conditions: List[str]) -> str:
-        """Search the web for diet recommendations based on abnormal conditions"""
-        try:
-            search_results = []
-            
-            for condition in abnormal_conditions:
-                # Simulate web search results (as in original code)
-                search_result = f"### Diet Information for {condition}\n"
-                search_result += "Based on recent medical research:\n"
-                search_result += "- Recommended foods: [would be populated from actual search]\n"
-                search_result += "- Foods to avoid: [would be populated from actual search]\n"
-                search_result += "- Recent studies suggest: [would be populated from actual search]\n\n"
-                
-                search_results.append(search_result)
-            
-            return "\n".join(search_results)
-        except Exception as e:
-            return f"Error searching for diet information: {str(e)}"
-
     async def extract_abnormal_conditions(self, report_text: str) -> List[str]:
         """Extract abnormal conditions from the report text"""
         try:
@@ -346,30 +327,13 @@ class HealthReportAnalyzer:
                 1. Analysis of each condition and its nutritional implications
                 2. Specific foods to eat and avoid for each condition
                 3. A detailed 7-day meal plan with recipes
-                4. Supplement recommendations if needed"""
+                4. Supplement recommendations if needed
+                
+                Combine your medical knowledge with practical meal planning."""
             
             diet_plan = await self._run_agent(diet_system_prompt, f"Create a personalized diet plan for these conditions: {' '.join(conditions)}")
             
-            web_results = await self.web_search_diet_info(conditions)
-            
-            combined_system_prompt = """You are a medical nutritionist creating the optimal diet plan.
-                Combine the AI-generated diet plan with web research to create the most 
-                comprehensive and evidence-based recommendations.
-                Keep formatting clear with headers, bullet points, and 7-day meal plan."""
-            
-            combined_input = f"""
-            AI Diet Plan:
-            {diet_plan}
-            
-            Web Research:
-            {web_results}
-            
-            Create an optimized diet plan combining this information.
-            """
-            
-            final_diet_plan = await self._run_agent(combined_system_prompt, combined_input)
-            
-            return final_diet_plan
+            return diet_plan
         except Exception as e:
             logger.error(f"Error creating diet plan: {str(e)}")
             return f"Error creating diet plan: {str(e)}"

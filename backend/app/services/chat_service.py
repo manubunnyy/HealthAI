@@ -3,8 +3,8 @@ import io
 import asyncio
 from typing import Dict, List, Optional, Union, Callable
 from dataclasses import dataclass
-import pytesseract
-from PIL import Image
+# import pytesseract (Removed for memory optimization)
+# from PIL import Image (Removed for memory optimization)
 from PyPDF2 import PdfReader
 from groq import Groq
 from dotenv import load_dotenv
@@ -104,13 +104,38 @@ class DocumentProcessor:
             raise Exception(f"PDF processing error: {str(e)}")
 
     async def process_image(self, file_content: bytes) -> str:
-        """Process image with OCR"""
+        """Process image using Groq Vision API (Lightweight)"""
         try:
-            image = Image.open(io.BytesIO(file_content))
-            text = pytesseract.image_to_string(image)
-            return text.strip()
+            # Use Groq Vision instead of local Tesseract (saves memory)
+            import base64
+            image_base64 = base64.b64encode(file_content).decode('utf-8')
+            
+            api_key = os.getenv("GROQ_API_KEY")
+            client = Groq(api_key=api_key)
+            
+            completion = client.chat.completions.create(
+                model="llama-3.2-11b-vision-preview",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Extract all text from this medical image. Return ONLY the extracted text."},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                temperature=0.1,
+                max_tokens=1024
+            )
+            return completion.choices[0].message.content
         except Exception as e:
-            raise Exception(f"Image processing error: {str(e)}")
+            logger.error(f"Image processing error: {str(e)}")
+            return "Error extracting text from image."
 
     def get_full_context(self) -> str:
         """Get full context from all processed documents"""
