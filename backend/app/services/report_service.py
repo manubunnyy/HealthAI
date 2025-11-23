@@ -169,136 +169,124 @@ class HealthReportAnalyzer:
         """Split text into chunks to avoid OOM"""
         return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-    async def analyze_report(self, report_text: str) -> Dict[str, AgentResponse]:
-        """Analyze report using Map-Reduce strategy for large files"""
+    async def analyze_report(self, file_object=None, text_content: str = None) -> Dict[str, AgentResponse]:
+        """
+        Analyze report using Streaming Map-Reduce strategy.
+        Accepts either a file_object (for PDFs) or text_content (for other formats).
+        """
         results = {}
-        CHUNK_SIZE = 40000
+        CHUNK_SIZE = 30000 # Reduced chunk size for safety
         
         try:
-            # Skip local PII sanitization (user request)
-            sanitized_text = report_text
+            all_positive_findings = []
+            all_negative_findings = []
             
-            # Check if we need to chunk
-            if len(sanitized_text) > CHUNK_SIZE:
-                logger.info(f"Large report detected ({len(sanitized_text)} chars). Using Map-Reduce chunking.")
-                chunks = self._chunk_text(sanitized_text, CHUNK_SIZE)
+            # Helper to process a single chunk
+            async def process_chunk(chunk_text):
+                if not chunk_text.strip(): return
                 
-                # Phase 1: Map (Extraction)
-                # Run extractors on each chunk
-                all_positive_findings = []
-                all_negative_findings = []
+                logger.info(f"Processing chunk of size {len(chunk_text)}")
                 
-                for i, chunk in enumerate(chunks):
-                    logger.info(f"Processing chunk {i+1}/{len(chunks)}")
+                # Run Positive Analyzer
+                pos_prompt = self.agent_prompts['positive_analyzer'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
+                pos_res = await self._run_agent(pos_prompt, chunk_text)
+                all_positive_findings.append(pos_res)
+                
+                # Run Negative Analyzer
+                neg_prompt = self.agent_prompts['negative_analyzer'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
+                neg_res = await self._run_agent(neg_prompt, chunk_text)
+                all_negative_findings.append(neg_res)
+                
+                # Force GC
+                import gc
+                gc.collect()
+
+            # STREAMING LOGIC
+            if file_object:
+                # It's a PDF file object
+                from PyPDF2 import PdfReader
+                pdf_reader = PdfReader(file_object)
+                current_chunk = ""
+                
+                for page in pdf_reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        current_chunk += extracted + "\n"
                     
-                    # Run Positive Analyzer
-                    pos_prompt = self.agent_prompts['positive_analyzer'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
-                    pos_res = await self._run_agent(pos_prompt, chunk)
-                    all_positive_findings.append(pos_res)
-                    import gc; gc.collect()
+                    # If chunk is big enough, process it immediately and clear memory
+                    if len(current_chunk) >= CHUNK_SIZE:
+                        await process_chunk(current_chunk)
+                        current_chunk = "" # Clear memory
+                        import gc; gc.collect()
+                
+                # Process remaining text
+                if current_chunk:
+                    await process_chunk(current_chunk)
+                    del current_chunk
                     
-                    # Run Negative Analyzer
-                    neg_prompt = self.agent_prompts['negative_analyzer'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
-                    neg_res = await self._run_agent(neg_prompt, chunk)
-                    all_negative_findings.append(neg_res)
-                    import gc; gc.collect()
-                
-                # Combine findings
-                combined_positive = "\n".join(all_positive_findings)
-                combined_negative = "\n".join(all_negative_findings)
-                
-                # Format positive findings
-                formatted_positive = self._format_findings(combined_positive)
-                
-                # Store extraction results
-                results['positive_analyzer'] = AgentResponse(
-                    agent_name='positive_analyzer',
-                    content=sanitize_text(formatted_positive),
-                    confidence=0.9,
-                    processing_time=0.0
-                )
-                results['negative_analyzer'] = AgentResponse(
-                    agent_name='negative_analyzer',
-                    content=sanitize_text(combined_negative),
-                    confidence=0.9,
-                    processing_time=0.0
-                )
-                
-                # Phase 2: Reduce (Synthesis)
-                # Run summary and recommendations on the EXTRACTED findings, not the raw text
-                # This ensures the context is small and focused
-                synthesis_context = f"""
-                Based on the following extracted findings from a medical report:
-                
-                POSITIVE FINDINGS:
-                {formatted_positive}
-                
-                NEGATIVE FINDINGS:
-                {combined_negative}
-                """
-                
-                # Run Summary Agent
-                sum_prompt = self.agent_prompts['summary_agent'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
-                sum_res = await self._run_agent(sum_prompt, synthesis_context)
-                results['summary_agent'] = AgentResponse(
-                    agent_name='summary_agent',
-                    content=sanitize_text(sum_res),
-                    confidence=0.9,
-                    processing_time=0.0
-                )
-                import gc; gc.collect()
-                
-                # Run Recommendation Agent
-                rec_prompt = self.agent_prompts['recommendation_agent'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
-                rec_res = await self._run_agent(rec_prompt, synthesis_context)
-                results['recommendation_agent'] = AgentResponse(
-                    agent_name='recommendation_agent',
-                    content=sanitize_text(rec_res),
-                    confidence=0.9,
-                    processing_time=0.0
-                )
-                import gc; gc.collect()
-                
-            else:
-                # Standard processing for small files
-                for agent_name, system_prompt in self.agent_prompts.items():
-                    privacy_instruction = "\n\nIMPORTANT PRIVACY INSTRUCTION: You are processing a medical report. STRICTLY DO NOT output the patient's name, ID, date of birth, or any other personally identifiable information (PII). Refer to the patient as 'The Patient'. Anonymize all output."
-                    full_prompt = system_prompt + privacy_instruction
-                    start_time = time.time()
-                    
-                    try:
-                        # Pass the full text directly with privacy-enhanced prompt
-                        response = await self._run_agent(full_prompt, sanitized_text)
-                        
-                        if agent_name == 'positive_analyzer':
-                            response = self._format_findings(response)
-                        
-                        # Sanitize PII from response before showing to user
-                        response = sanitize_text(response)
-                        
-                        processing_time = time.time() - start_time
-                        
-                        results[agent_name] = AgentResponse(
-                            agent_name=agent_name,
-                            content=response,
-                            confidence=0.9,
-                            processing_time=processing_time
-                        )
-                        
-                    except Exception as e:
-                        logger.error(f"Error in agent {agent_name}: {str(e)}")
-                        results[agent_name] = AgentResponse(
-                            agent_name=agent_name,
-                            content=f"Error: {str(e)}",
-                            confidence=0.0,
-                            processing_time=0.0
-                        )
-                    
-                    # Force garbage collection after each agent
-                    import gc
-                    gc.collect()
+            elif text_content:
+                # It's raw text (already loaded, so we just chunk it)
+                # This path is less memory efficient but unavoidable for non-PDFs if they are already read
+                chunks = self._chunk_text(text_content, CHUNK_SIZE)
+                for chunk in chunks:
+                    await process_chunk(chunk)
             
+            # REDUCE PHASE (Synthesis)
+            # Combine findings
+            combined_positive = "\n".join(all_positive_findings)
+            combined_negative = "\n".join(all_negative_findings)
+            
+            # Format positive findings
+            formatted_positive = self._format_findings(combined_positive)
+            
+            # Store extraction results
+            results['positive_analyzer'] = AgentResponse(
+                agent_name='positive_analyzer',
+                content=sanitize_text(formatted_positive),
+                confidence=0.9,
+                processing_time=0.0
+            )
+            results['negative_analyzer'] = AgentResponse(
+                agent_name='negative_analyzer',
+                content=sanitize_text(combined_negative),
+                confidence=0.9,
+                processing_time=0.0
+            )
+            
+            # Synthesis Context
+            synthesis_context = f"""
+            Based on the following extracted findings from a medical report:
+            
+            POSITIVE FINDINGS:
+            {formatted_positive}
+            
+            NEGATIVE FINDINGS:
+            {combined_negative}
+            """
+            
+            # Run Summary Agent
+            sum_prompt = self.agent_prompts['summary_agent'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
+            sum_res = await self._run_agent(sum_prompt, synthesis_context)
+            results['summary_agent'] = AgentResponse(
+                agent_name='summary_agent',
+                content=sanitize_text(sum_res),
+                confidence=0.9,
+                processing_time=0.0
+            )
+            
+            # Run Recommendation Agent
+            rec_prompt = self.agent_prompts['recommendation_agent'] + "\n\nIMPORTANT PRIVACY INSTRUCTION: Anonymize all output."
+            rec_res = await self._run_agent(rec_prompt, synthesis_context)
+            results['recommendation_agent'] = AgentResponse(
+                agent_name='recommendation_agent',
+                content=sanitize_text(rec_res),
+                confidence=0.9,
+                processing_time=0.0
+            )
+            
+            import gc; gc.collect()
             return results
+            
         except Exception as e:
             logger.error(f"Error in analyze_report: {str(e)}")
             raise

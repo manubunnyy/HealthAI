@@ -29,42 +29,19 @@ async def analyze_report(file: UploadFile = File(...)):
             try:
                 # Reset file pointer to beginning
                 await file.seek(0)
-                # Pass the file-like object directly
-                pdf_reader = PdfReader(file.file)
-                text = ""
-                for page in pdf_reader.pages:
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-                
-                # Truncation removed in favor of Map-Reduce Chunking in service layer
-                
-                if not text.strip():
-                    raise HTTPException(
-                        status_code=400, 
-                        detail="Could not extract text from PDF. If this is a scanned document, please use an image format or a text-based PDF."
-                    )
+                # Pass the file-like object directly to the service for streaming processing
+                results = await analyzer.analyze_report(file_object=file.file)
             except Exception as e:
-                if isinstance(e, HTTPException):
-                    raise e
-                raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Error processing PDF: {str(e)}")
         else:
             # For non-PDFs, we still need to read, but they are usually smaller text files
             content = await file.read()
             text = content.decode()
+            results = await analyzer.analyze_report(text_content=text)
             
-        # Explicitly clear large objects to free memory before analysis
-        if 'pdf_reader' in locals():
-            del pdf_reader
-        if 'content' in locals():
-            del content
-            
+        # Explicitly clear large objects
         import gc
         gc.collect()
-            
-        results = await analyzer.analyze_report(text)
-            
-        results = await analyzer.analyze_report(text)
         
         # Convert AgentResponse objects to dicts
         formatted_results = {}
