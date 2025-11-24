@@ -36,9 +36,11 @@ export default function ESafePage() {
         { id: 'Pregnancy', icon: Baby, color: 'text-purple-500', border: 'border-purple-500/50', gradient: 'from-purple-500/20 to-violet-500/20' },
     ];
 
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
     useEffect(() => {
         if (showSettings) {
-            fetch('http://localhost:8000/esafe/config')
+            fetch(`${API_URL}/esafe/config`)
                 .then(res => res.json())
                 .then(data => {
                     if (data.sender_email) {
@@ -96,7 +98,7 @@ export default function ESafePage() {
                 formData.append('photos', photo);
             });
 
-            const response = await fetch('http://localhost:8000/esafe/alert', {
+            const response = await fetch(`${API_URL}/esafe/alert`, {
                 method: 'POST',
                 body: formData,
             });
@@ -117,7 +119,7 @@ export default function ESafePage() {
     const handleSaveConfig = async () => {
         setSavingConfig(true);
         try {
-            const response = await fetch('http://localhost:8000/esafe/config', {
+            const response = await fetch(`${API_URL}/esafe/config`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(emailConfig)
