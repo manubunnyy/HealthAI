@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import { Ambulance, Car, Heart, Baby, MapPin, Upload, Send, AlertTriangle } from 'lucide-react';
+import { Ambulance, Car, Heart, Baby, MapPin, Upload, Send, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 export default function ESafePage() {
     const [step, setStep] = useState<'type' | 'location' | 'details' | 'success'>('type');
@@ -84,19 +84,34 @@ export default function ESafePage() {
         }
     };
 
+    const handleBack = () => {
+        if (step === 'location') setStep('type');
+        if (step === 'details') setStep('location');
+    };
+
     return (
-        <div className="min-h-screen bg-black text-white p-4 pb-24 pt-24">
-            <div className="max-w-2xl mx-auto space-y-8">
+        <div className="min-h-screen text-white p-4 pb-24 pt-24">
+            <div className="max-w-2xl mx-auto space-y-8 relative">
+                {step !== 'type' && step !== 'success' && (
+                    <button
+                        onClick={handleBack}
+                        className="absolute left-0 -top-12 md:top-2 p-2 text-gray-400 hover:text-white transition-colors flex items-center gap-2 hover:bg-white/10 rounded-lg"
+                    >
+                        <ArrowLeft size={20} />
+                        <span>Back</span>
+                    </button>
+                )}
+
                 <div className="text-center space-y-2">
                     <h1 className="text-4xl font-bold text-red-500 flex items-center justify-center gap-3">
                         <AlertTriangle size={40} />
                         Emergency Assistance
                     </h1>
-                    <p className="text-gray-400">Get help quickly in emergency situations</p>
+                    <p className="text-gray-300">Get help quickly in emergency situations</p>
                 </div>
 
                 {error && (
-                    <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl text-red-200 text-center">
+                    <div className="glass-panel border-red-500/50 p-4 text-red-200 text-center bg-red-900/20">
                         {error}
                     </div>
                 )}
@@ -110,7 +125,7 @@ export default function ESafePage() {
                                     setEmergencyType(type.id);
                                     setStep('location');
                                 }}
-                                className={`p-6 bg-glass-100 hover:bg-glass-200 border ${type.border} rounded-2xl transition-all hover:scale-105 flex flex-col items-center gap-4 group`}
+                                className={`glass-panel p-6 hover:bg-glass-200 border ${type.border} transition-all hover:scale-105 flex flex-col items-center gap-4 group`}
                             >
                                 <type.icon size={48} className={`${type.color} group-hover:scale-110 transition-transform`} />
                                 <span className="text-xl font-semibold">{type.id}</span>
@@ -121,13 +136,13 @@ export default function ESafePage() {
 
                 {step === 'location' && (
                     <div className="space-y-6">
-                        <div className="bg-glass-100 p-6 rounded-2xl border border-glass-border space-y-4">
+                        <div className="glass-panel p-8 space-y-6">
                             <h2 className="text-2xl font-semibold text-center">Share Location</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <button
                                     onClick={handleLocation}
                                     disabled={loading}
-                                    className="p-4 bg-blue-600 hover:bg-blue-700 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                                    className="glass-button bg-blue-600/80 hover:bg-blue-600 flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
                                     {loading ? (
                                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -139,7 +154,7 @@ export default function ESafePage() {
                                 </button>
                                 <button
                                     onClick={() => setStep('details')}
-                                    className="p-4 bg-gray-700 hover:bg-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                    className="glass-button bg-glass-200 hover:bg-glass-300 flex items-center justify-center gap-2"
                                 >
                                     Enter Address Manually
                                 </button>
@@ -150,7 +165,7 @@ export default function ESafePage() {
 
                 {step === 'details' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="bg-glass-100 p-6 rounded-2xl border border-glass-border space-y-6">
+                        <div className="glass-panel p-8 space-y-6">
                             <h2 className="text-2xl font-semibold">Additional Details</h2>
 
                             <div className="space-y-2">
@@ -159,7 +174,7 @@ export default function ESafePage() {
                                     value={address}
                                     onChange={(e) => setAddress(e.target.value)}
                                     placeholder="Enter complete address or nearby landmarks..."
-                                    className="w-full p-4 bg-black/50 border border-gray-700 rounded-xl focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none transition-all min-h-[100px]"
+                                    className="glass-input w-full min-h-[100px]"
                                 />
                             </div>
 
@@ -167,7 +182,7 @@ export default function ESafePage() {
                                 <label className="block text-sm font-medium text-gray-300">Photos (Optional)</label>
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="border-2 border-dashed border-gray-700 hover:border-gray-500 rounded-xl p-8 text-center cursor-pointer transition-colors"
+                                    className="glass-input border-dashed border-2 hover:border-gray-400 p-8 text-center cursor-pointer transition-colors flex flex-col items-center justify-center"
                                 >
                                     <input
                                         type="file"
@@ -177,10 +192,10 @@ export default function ESafePage() {
                                         accept="image/*"
                                         className="hidden"
                                     />
-                                    <Upload className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+                                    <Upload className="h-12 w-12 text-gray-400 mb-4" />
                                     <p className="text-gray-400">Click to upload photos of the situation</p>
                                     {photos.length > 0 && (
-                                        <p className="text-green-500 mt-2">{photos.length} photo(s) selected</p>
+                                        <p className="text-green-400 mt-2 font-medium">{photos.length} photo(s) selected</p>
                                     )}
                                 </div>
                             </div>
@@ -188,7 +203,7 @@ export default function ESafePage() {
                             <button
                                 onClick={handleSubmit}
                                 disabled={loading}
-                                className="w-full p-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 shadow-lg shadow-red-900/20"
+                                className="glass-button w-full bg-red-600/80 hover:bg-red-600 font-bold text-lg flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
                             >
                                 {loading ? (
                                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
@@ -208,11 +223,11 @@ export default function ESafePage() {
                             <Send size={48} className="text-white" />
                         </div>
                         <h2 className="text-3xl font-bold text-green-500">Alert Sent Successfully!</h2>
-                        <div className="bg-glass-100 p-6 rounded-2xl border border-green-500/30 space-y-4">
+                        <div className="glass-panel p-8 border-green-500/30 space-y-4">
                             <p className="text-xl">Help is on the way!</p>
                             <p className="text-gray-400">Estimated arrival time: <span className="text-white font-bold">5-15 minutes</span></p>
 
-                            <div className="border-t border-gray-700 pt-4 mt-4 text-left space-y-2">
+                            <div className="border-t border-glass-border pt-4 mt-4 text-left space-y-2">
                                 <p className="font-semibold text-yellow-500">Important Instructions:</p>
                                 <ul className="list-disc list-inside text-gray-300 space-y-1">
                                     <li>Stay calm and remain in your current location</li>
@@ -230,7 +245,7 @@ export default function ESafePage() {
                                 setAddress('');
                                 setPhotos([]);
                             }}
-                            className="text-gray-400 hover:text-white underline"
+                            className="text-gray-400 hover:text-white underline transition-colors"
                         >
                             Start New Emergency Request
                         </button>
