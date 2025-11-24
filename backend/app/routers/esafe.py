@@ -97,6 +97,98 @@ def send_telegram_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         logger.error(f"Failed to send emergency alert: {e}")
         return False
 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
+import json
+
+# Email Configuration File
+EMAIL_CONFIG_FILE = "email_config.json"
+
+class EmailConfig(BaseModel):
+    sender_email: str
+    sender_password: str
+    receiver_email: str
+
+def load_email_config():
+    if os.path.exists(EMAIL_CONFIG_FILE):
+        with open(EMAIL_CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return None
+
+def save_email_config(config: EmailConfig):
+    with open(EMAIL_CONFIG_FILE, "w") as f:
+        json.dump(config.dict(), f)
+
+def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
+    """Send emergency details via email"""
+    config = load_email_config()
+    if not config:
+        logger.warning("Email configuration not found. Skipping email alert.")
+        return
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = config['sender_email']
+        msg['To'] = config['receiver_email']
+        msg['Subject'] = f"🚨 EMERGENCY ALERT: {alert.type}"
+
+        body = (
+            f"🚨 NEW EMERGENCY ALERT 🚨\n\n"
+            f"Type: {alert.type}\n"
+            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        )
+
+        if alert.latitude and alert.longitude:
+            maps_link = f"https://www.google.com/maps?q={alert.latitude},{alert.longitude}"
+            body += (
+                f"📍 Location Coordinates: {alert.latitude}, {alert.longitude}\n"
+                f"🗺️ Google Maps: {maps_link}\n"
+            )
+
+        if alert.text_address:
+            body += f"🏠 Provided Address: {alert.text_address}\n"
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Attach photos
+        for i, photo_bytes in enumerate(photos):
+            img = MIMEImage(photo_bytes)
+            img.add_header('Content-Disposition', 'attachment', filename=f"emergency_photo_{i+1}.jpg")
+            msg.attach(img)
+
+        # Send email
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(config['sender_email'], config['sender_password'])
+            server.send_message(msg)
+        
+        logger.info("Email alert sent successfully")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send email alert: {e}")
+        return False
+
+@router.post("/config")
+async def update_email_config(config: EmailConfig):
+    """Update email configuration"""
+    try:
+        save_email_config(config)
+        return {"status": "success", "message": "Email configuration updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/config")
+async def get_email_config():
+    """Get current email configuration (masking password)"""
+    config = load_email_config()
+    if config:
+        config['sender_password'] = "********"
+        return config
+    return {}
+
 @router.post("/alert")
 async def create_alert(
     background_tasks: BackgroundTasks,
@@ -124,8 +216,9 @@ async def create_alert(
                 content = await photo.read()
                 photo_contents.append(content)
         
-        # Send alert in background to not block response
+        # Send alerts in background
         background_tasks.add_task(send_telegram_alert, alert, photo_contents)
+        background_tasks.add_task(send_email_alert, alert, photo_contents)
         
         return {"status": "success", "message": "Emergency alert dispatched"}
     except Exception as e:
