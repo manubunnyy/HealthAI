@@ -5,11 +5,9 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.image import MIMEImage
+import resend
 import json
+import base64
 
 load_dotenv()
 
@@ -18,6 +16,10 @@ router = APIRouter(prefix="/esafe", tags=["esafe"])
 # Configure logging
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Configure Resend
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_4d4S623A_DSKoC5aXLmXUv6as1BoEXYJK")
+resend.api_key = RESEND_API_KEY
 
 class EmergencyAlert(BaseModel):
     type: str
@@ -44,25 +46,14 @@ def save_email_config(config: EmailConfig):
         json.dump(config.dict(), f)
 
 def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
-    """Send emergency details via email"""
-    # Temporary hardcoded credentials
-    config = {
-        "sender_email": "mangalarapumanu@gmail.com",
-        "sender_password": "itea ctjl brvv rklk", # Spaces are usually ignored by Gmail SMTP
-        "receiver_email": "mangalarapumanu@gmail.com"
-    }
+    """Send emergency details via email using Resend API"""
+    # Hardcoded receiver email
+    receiver_email = "mangalarapumanu@gmail.com"
     
-    if not config:
-        logger.warning("Email configuration not found. Skipping email alert.")
-        return
-
     try:
-        print(f"Attempting to send email from {config['sender_email']} to {config['receiver_email']}")
-        msg = MIMEMultipart()
-        msg['From'] = config['sender_email']
-        msg['To'] = config['receiver_email']
-        msg['Subject'] = f"🚨 EMERGENCY ALERT: {alert.type}"
-
+        print(f"Attempting to send email to {receiver_email} via Resend API")
+        
+        # Build email body
         body = (
             f"🚨 NEW EMERGENCY ALERT 🚨\n\n"
             f"Type: {alert.type}\n"
@@ -79,30 +70,35 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         if alert.text_address:
             body += f"🏠 Provided Address: {alert.text_address}\n"
 
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Attach photos
+        # Prepare attachments
+        attachments = []
         for i, photo_bytes in enumerate(photos):
-            img = MIMEImage(photo_bytes)
-            img.add_header('Content-Disposition', 'attachment', filename=f"emergency_photo_{i+1}.jpg")
-            msg.attach(img)
+            attachments.append({
+                "filename": f"emergency_photo_{i+1}.jpg",
+                "content": base64.b64encode(photo_bytes).decode()
+            })
 
-        # Send email - Using port 465 (SSL) instead of 587 (TLS) for Render compatibility
-        print("Connecting to SMTP server on port 465...")
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.set_debuglevel(1) # Enable SMTP debug output
-            print("Logging in...")
-            server.login(config['sender_email'], config['sender_password'])
-            print("Sending message...")
-            server.send_message(msg)
+        # Send email via Resend
+        params = {
+            "from": "HealthAI eSafe <onboarding@resend.dev>",
+            "to": [receiver_email],
+            "subject": f"🚨 EMERGENCY ALERT: {alert.type}",
+            "text": body,
+        }
         
-        print("Email sent successfully!")
-        logger.info("Email alert sent successfully")
+        if attachments:
+            params["attachments"] = attachments
+
+        print("Sending email via Resend API...")
+        response = resend.Emails.send(params)
+        
+        print(f"Email sent successfully! Response: {response}")
+        logger.info(f"Email alert sent successfully via Resend: {response}")
         return True
 
     except Exception as e:
         print(f"ERROR SENDING EMAIL: {e}")
-        logger.error(f"Failed to send email alert: {e}")
+        logger.error(f"Failed to send email alert via Resend: {e}")
         return False
 
 @router.post("/config")
