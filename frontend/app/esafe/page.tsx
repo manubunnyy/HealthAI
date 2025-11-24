@@ -14,10 +14,10 @@ export default function ESafePage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const emergencyTypes = [
-        { id: 'Medical Emergency', icon: Ambulance, color: 'text-red-500', border: 'border-red-500/50' },
-        { id: 'Accident', icon: Car, color: 'text-orange-500', border: 'border-orange-500/50' },
-        { id: 'Heart/Chest Pain', icon: Heart, color: 'text-pink-500', border: 'border-pink-500/50' },
-        { id: 'Pregnancy', icon: Baby, color: 'text-purple-500', border: 'border-purple-500/50' },
+        { id: 'Medical Emergency', icon: Ambulance, color: 'text-red-500', border: 'border-red-500/50', gradient: 'from-red-500/20 to-pink-500/20' },
+        { id: 'Accident', icon: Car, color: 'text-orange-500', border: 'border-orange-500/50', gradient: 'from-orange-500/20 to-yellow-500/20' },
+        { id: 'Heart/Chest Pain', icon: Heart, color: 'text-pink-500', border: 'border-pink-500/50', gradient: 'from-pink-500/20 to-rose-500/20' },
+        { id: 'Pregnancy', icon: Baby, color: 'text-purple-500', border: 'border-purple-500/50', gradient: 'from-purple-500/20 to-violet-500/20' },
     ];
 
     const handleLocation = () => {
@@ -125,10 +125,13 @@ export default function ESafePage() {
                                     setEmergencyType(type.id);
                                     setStep('location');
                                 }}
-                                className={`glass-panel p-6 hover:bg-glass-200 border ${type.border} transition-all hover:scale-105 flex flex-col items-center gap-4 group`}
+                                className={`glass-panel p-6 border ${type.border} transition-all hover:scale-105 group relative overflow-hidden`}
                             >
-                                <type.icon size={48} className={`${type.color} group-hover:scale-110 transition-transform`} />
-                                <span className="text-xl font-semibold">{type.id}</span>
+                                <div className={`absolute inset-0 bg-gradient-to-br ${type.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                                <div className="relative z-10 flex flex-col items-center gap-4">
+                                    <type.icon size={48} className={`${type.color} group-hover:scale-110 transition-transform`} />
+                                    <span className="text-xl font-semibold">{type.id}</span>
+                                </div>
                             </button>
                         ))}
                     </div>
