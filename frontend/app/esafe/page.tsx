@@ -102,12 +102,13 @@ export default function ESafePage() {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to send alert');
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to send alert');
             }
 
             setStep('success');
-        } catch (err) {
-            setError('Failed to send emergency alert. Please try again.');
+        } catch (err: any) {
+            setError(err.message || 'Failed to send emergency alert. Please try again.');
         } finally {
             setLoading(false);
         }
