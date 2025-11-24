@@ -57,6 +57,7 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         return
 
     try:
+        print(f"Attempting to send email from {config['sender_email']} to {config['receiver_email']}")
         msg = MIMEMultipart()
         msg['From'] = config['sender_email']
         msg['To'] = config['receiver_email']
@@ -87,15 +88,21 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
             msg.attach(img)
 
         # Send email
+        print("Connecting to SMTP server...")
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.set_debuglevel(1) # Enable SMTP debug output
             server.starttls()
+            print("Logging in...")
             server.login(config['sender_email'], config['sender_password'])
+            print("Sending message...")
             server.send_message(msg)
         
+        print("Email sent successfully!")
         logger.info("Email alert sent successfully")
         return True
 
     except Exception as e:
+        print(f"ERROR SENDING EMAIL: {e}")
         logger.error(f"Failed to send email alert: {e}")
         return False
 
