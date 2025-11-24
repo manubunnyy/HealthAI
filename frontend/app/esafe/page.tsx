@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
-import { Ambulance, Car, Heart, Baby, MapPin, Upload, Send, AlertTriangle, ArrowLeft, Settings, X } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Ambulance, Car, Heart, Baby, MapPin, Upload, Send, AlertTriangle, ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Map component to avoid SSR issues
@@ -20,15 +20,6 @@ export default function ESafePage() {
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Admin Settings State
-    const [showSettings, setShowSettings] = useState(false);
-    const [emailConfig, setEmailConfig] = useState({
-        sender_email: '',
-        sender_password: '',
-        receiver_email: ''
-    });
-    const [savingConfig, setSavingConfig] = useState(false);
-
     const emergencyTypes = [
         { id: 'Medical Emergency', icon: Ambulance, color: 'text-red-500', border: 'border-red-500/50', gradient: 'from-red-500/20 to-pink-500/20' },
         { id: 'Accident', icon: Car, color: 'text-orange-500', border: 'border-orange-500/50', gradient: 'from-orange-500/20 to-yellow-500/20' },
@@ -37,19 +28,6 @@ export default function ESafePage() {
     ];
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-    useEffect(() => {
-        if (showSettings) {
-            fetch(`${API_URL}/esafe/config`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.sender_email) {
-                        setEmailConfig(prev => ({ ...prev, ...data, sender_password: '' }));
-                    }
-                })
-                .catch(err => console.error("Failed to load config", err));
-        }
-    }, [showSettings]);
 
     const handleLocation = () => {
         setLoading(true);
@@ -61,7 +39,6 @@ export default function ESafePage() {
                         lng: position.coords.longitude
                     });
                     setLoading(false);
-                    // Don't auto-advance, let user see map
                 },
                 (err) => {
                     setError("Could not get location. Please enter address manually.");
@@ -116,27 +93,6 @@ export default function ESafePage() {
         }
     };
 
-    const handleSaveConfig = async () => {
-        setSavingConfig(true);
-        try {
-            const response = await fetch(`${API_URL}/esafe/config`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(emailConfig)
-            });
-            if (response.ok) {
-                setShowSettings(false);
-                alert("Settings saved successfully!");
-            } else {
-                alert("Failed to save settings");
-            }
-        } catch (e) {
-            alert("Error saving settings");
-        } finally {
-            setSavingConfig(false);
-        }
-    };
-
     const handleBack = () => {
         if (step === 'location') setStep('type');
         if (step === 'details') setStep('location');
@@ -145,25 +101,16 @@ export default function ESafePage() {
     return (
         <div className="min-h-screen text-white p-4 pb-24 pt-24">
             <div className="max-w-2xl mx-auto space-y-8 relative">
-                {/* Header Controls */}
-                <div className="flex justify-between items-center absolute w-full -top-12 md:top-2 px-2">
-                    {step !== 'type' && step !== 'success' ? (
-                        <button
-                            onClick={handleBack}
-                            className="p-2 text-gray-400 hover:text-white transition-colors flex items-center gap-2 hover:bg-white/10 rounded-lg"
-                        >
-                            <ArrowLeft size={20} />
-                            <span>Back</span>
-                        </button>
-                    ) : <div></div>}
-
+                {/* Back Button */}
+                {step !== 'type' && step !== 'success' && (
                     <button
-                        onClick={() => setShowSettings(true)}
-                        className="p-2 text-gray-400 hover:text-white transition-colors hover:bg-white/10 rounded-lg"
+                        onClick={handleBack}
+                        className="absolute left-0 -top-12 md:top-2 p-2 text-gray-400 hover:text-white transition-colors flex items-center gap-2 hover:bg-white/10 rounded-lg"
                     >
-                        <Settings size={20} />
+                        <ArrowLeft size={20} />
+                        <span>Back</span>
                     </button>
-                </div>
+                )}
 
                 <div className="text-center space-y-2 pt-8 md:pt-0">
                     <h1 className="text-4xl font-bold text-red-500 flex items-center justify-center gap-3">
@@ -325,61 +272,6 @@ export default function ESafePage() {
                     </div>
                 )}
 
-                {/* Settings Modal */}
-                {showSettings && (
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="glass-panel p-8 max-w-md w-full space-y-6 animate-in zoom-in duration-200">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-bold">Admin Settings</h2>
-                                <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-white">
-                                    <X size={24} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm text-gray-300">Sender Email (Gmail)</label>
-                                    <input
-                                        type="email"
-                                        value={emailConfig.sender_email}
-                                        onChange={e => setEmailConfig({ ...emailConfig, sender_email: e.target.value })}
-                                        className="glass-input w-full"
-                                        placeholder="your-email@gmail.com"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm text-gray-300">App Password</label>
-                                    <input
-                                        type="password"
-                                        value={emailConfig.sender_password}
-                                        onChange={e => setEmailConfig({ ...emailConfig, sender_password: e.target.value })}
-                                        className="glass-input w-full"
-                                        placeholder="App Password (not login password)"
-                                    />
-                                    <p className="text-xs text-gray-500">Use an App Password from Google Account settings.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm text-gray-300">Receiver Email</label>
-                                    <input
-                                        type="email"
-                                        value={emailConfig.receiver_email}
-                                        onChange={e => setEmailConfig({ ...emailConfig, receiver_email: e.target.value })}
-                                        className="glass-input w-full"
-                                        placeholder="admin@example.com"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleSaveConfig}
-                                disabled={savingConfig}
-                                className="glass-button w-full bg-blue-600/80 hover:bg-blue-600 font-bold"
-                            >
-                                {savingConfig ? "Saving..." : "Save Configuration"}
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
