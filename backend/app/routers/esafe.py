@@ -87,11 +87,10 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
             img.add_header('Content-Disposition', 'attachment', filename=f"emergency_photo_{i+1}.jpg")
             msg.attach(img)
 
-        # Send email
-        print("Connecting to SMTP server...")
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+        # Send email - Using port 465 (SSL) instead of 587 (TLS) for Render compatibility
+        print("Connecting to SMTP server on port 465...")
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
             server.set_debuglevel(1) # Enable SMTP debug output
-            server.starttls()
             print("Logging in...")
             server.login(config['sender_email'], config['sender_password'])
             print("Sending message...")
