@@ -16,13 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import chat, diet, prediction, report, image
+from app.routers import chat, diet, prediction, report, image, esafe
 
 app.include_router(chat.router)
 app.include_router(diet.router)
 app.include_router(prediction.router)
 app.include_router(report.router)
 app.include_router(image.router)
+app.include_router(esafe.router)
 
 @app.get("/")
 async def root():
