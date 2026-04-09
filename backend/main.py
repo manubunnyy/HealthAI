@@ -1,7 +1,8 @@
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
@@ -16,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.routers import chat, diet, prediction, report, image, esafe
+from app.routers import chat, diet, esafe, image, prediction, report
 
 app.include_router(chat.router)
 app.include_router(diet.router)
@@ -25,16 +26,20 @@ app.include_router(report.router)
 app.include_router(image.router)
 app.include_router(esafe.router)
 
+
 @app.get("/")
 async def root():
     return {"message": "HealthAI API is running"}
+
 
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
 
+
 # For running with uvicorn
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port, workers=1)

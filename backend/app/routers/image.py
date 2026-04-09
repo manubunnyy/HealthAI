@@ -1,9 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
 from app.services.image_service import ImageAnalysisService
-import io
 
 router = APIRouter(prefix="/image", tags=["image"])
 service = ImageAnalysisService()
+
 
 @router.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):

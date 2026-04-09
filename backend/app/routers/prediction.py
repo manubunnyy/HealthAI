@@ -1,10 +1,13 @@
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Optional, List
+
 from app.services.prediction_service import PredictionService
 
 router = APIRouter(prefix="/prediction", tags=["prediction"])
 service = PredictionService()
+
 
 class PredictionRequest(BaseModel):
     prediction_type: str
@@ -16,11 +19,13 @@ class PredictionRequest(BaseModel):
     bp_systolic: Optional[float] = None
     bp_diastolic: Optional[float] = None
 
+
 class PredictionResponse(BaseModel):
     bmi: float
     bmi_category: str
     insights: List[str]
     recommendations: List[str]
+
 
 @router.post("/analyze", response_model=PredictionResponse)
 async def analyze_health(request: PredictionRequest):
@@ -28,24 +33,25 @@ async def analyze_health(request: PredictionRequest):
     try:
         # Calculate BMI
         bmi = service.calculate_bmi(request.weight, request.height)
-        
+
         # Prepare metrics dictionary
         metrics = request.dict(exclude_none=True)
-        metrics['bmi'] = bmi
-        
+        metrics["bmi"] = bmi
+
         # Get insights
         insights = service.get_health_insights(metrics, request.prediction_type)
         recommendations = service.get_recommendations()
         bmi_category = service.get_bmi_category(bmi)
-        
+
         return PredictionResponse(
             bmi=bmi,
             bmi_category=bmi_category,
             insights=insights,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/config")
 async def get_config():

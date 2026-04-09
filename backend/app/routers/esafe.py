@@ -1,24 +1,28 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks
-from pydantic import BaseModel
-from typing import Optional, List
-import os
-import logging
-from datetime import datetime
-from dotenv import load_dotenv
-import resend
 import base64
+import logging
+import os
+from datetime import datetime
+from typing import List, Optional
+
+import resend
+from dotenv import load_dotenv
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 
 load_dotenv()
 
 router = APIRouter(prefix="/esafe", tags=["esafe"])
 
 # Configure logging
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # Configure Resend
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_4d4S623A_DSKoC5aXLmXUv6as1BoEXYJK")
 resend.api_key = RESEND_API_KEY
+
 
 class EmergencyAlert(BaseModel):
     type: str
@@ -26,10 +30,11 @@ class EmergencyAlert(BaseModel):
     longitude: Optional[float] = None
     text_address: Optional[str] = None
 
+
 def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
     """Send emergency details via email using Resend API"""
     receiver_email = "mangalarapumanu@gmail.com"
-    
+
     try:
         # Build email body
         body = (
@@ -39,7 +44,9 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         )
 
         if alert.latitude and alert.longitude:
-            maps_link = f"https://www.google.com/maps?q={alert.latitude},{alert.longitude}"
+            maps_link = (
+                f"https://www.google.com/maps?q={alert.latitude},{alert.longitude}"
+            )
             body += (
                 f"📍 Location Coordinates: {alert.latitude}, {alert.longitude}\n"
                 f"🗺️ Google Maps: {maps_link}\n"
@@ -51,10 +58,12 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         # Prepare attachments
         attachments = []
         for i, photo_bytes in enumerate(photos):
-            attachments.append({
-                "filename": f"emergency_photo_{i+1}.jpg",
-                "content": base64.b64encode(photo_bytes).decode()
-            })
+            attachments.append(
+                {
+                    "filename": f"emergency_photo_{i+1}.jpg",
+                    "content": base64.b64encode(photo_bytes).decode(),
+                }
+            )
 
         # Send email via Resend
         params = {
@@ -63,7 +72,7 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
             "subject": f"🚨 EMERGENCY ALERT: {alert.type}",
             "text": body,
         }
-        
+
         if attachments:
             params["attachments"] = attachments
 
@@ -75,6 +84,7 @@ def send_email_alert(alert: EmergencyAlert, photos: List[bytes] = []):
         logger.error(f"Failed to send email alert via Resend: {e}")
         return False
 
+
 @router.post("/alert")
 async def create_alert(
     background_tasks: BackgroundTasks,
@@ -82,26 +92,23 @@ async def create_alert(
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
     text_address: Optional[str] = Form(None),
-    photos: List[UploadFile] = File(None)
+    photos: List[UploadFile] = File(None),
 ):
     """Create an emergency alert and send email notification"""
     try:
         alert = EmergencyAlert(
-            type=type,
-            latitude=latitude,
-            longitude=longitude,
-            text_address=text_address
+            type=type, latitude=latitude, longitude=longitude, text_address=text_address
         )
-        
+
         photo_contents = []
         if photos:
             for photo in photos:
                 content = await photo.read()
                 photo_contents.append(content)
-        
+
         # Send alert in background
         background_tasks.add_task(send_email_alert, alert, photo_contents)
-        
+
         return {"status": "success", "message": "Emergency alert dispatched"}
     except Exception as e:
         logger.error(f"Error creating alert: {e}")
