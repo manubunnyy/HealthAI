@@ -645,35 +645,6 @@ For simple queries (like greetings), respond in one short sentence.""",
 
                 gc.collect()
 
-    async def process_contextual_chat(
-        self, query: str, feature_type: str, original_result: str, history: List[Dict[str, str]]
-    ) -> str:
-        """Process a follow-up contextual query"""
-        system_prompt = f"You are a specialized AI assistant for the '{feature_type}' feature. Be helpful and concise.\n\n"
-        system_prompt += f"Context of the original operation/result:\n{original_result}\n\n"
-        system_prompt += "Your goal is to answer the user's questions or adapt the previous result based on their request."
-
-        messages = [{"role": "system", "content": system_prompt}]
-        for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-        messages.append({"role": "user", "content": query})
-
-        def _call_api():
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2048,
-            )
-            return completion.choices[0].message.content
-
-        try:
-            response = await asyncio.to_thread(_call_api)
-            return sanitize_text(response)
-        except Exception as e:
-            logger.error(f"Contextual chat error: {str(e)}")
-            raise Exception(f"Failed to process follow-up: {str(e)}")
-
             # Run diet agent last
             if status_callback:
                 status_callback("diet_agent", "working", 0.2, "Creating diet plan")
@@ -712,6 +683,35 @@ For simple queries (like greetings), respond in one short sentence.""",
                     status_callback(agent, "error", 0, str(e))
                 status_callback("diet_agent", "error", 0, str(e))
             raise Exception(f"Query processing error: {str(e)}")
+
+    async def process_contextual_chat(
+        self, query: str, feature_type: str, original_result: str, history: List[Dict[str, str]]
+    ) -> str:
+        """Process a follow-up contextual query"""
+        system_prompt = f"You are a specialized AI assistant for the '{feature_type}' feature. Be helpful and concise.\n\n"
+        system_prompt += f"Context of the original operation/result:\n{original_result}\n\n"
+        system_prompt += "Your goal is to answer the user's questions or adapt the previous result based on their request."
+
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": query})
+
+        def _call_api():
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=2048,
+            )
+            return completion.choices[0].message.content
+
+        try:
+            response = await asyncio.to_thread(_call_api)
+            return sanitize_text(response)
+        except Exception as e:
+            logger.error(f"Contextual chat error: {str(e)}")
+            raise Exception(f"Failed to process follow-up: {str(e)}")
 
     async def _get_agent_response(
         self, agent_name: str, query: str, context: str, chat_history: str
